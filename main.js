@@ -1,33 +1,51 @@
 (function () {
-  let template = document.createElement("template");
+  const template = document.createElement("template");
   template.innerHTML = `
     <style>
       :host {
         display: block;
-        padding: 1rem;
+        font-family: "72", "SAP72", Arial, sans-serif;
       }
       .card {
         background: #ffffff;
-        border-radius: 4px;
-        border: 1px solid #d9d9d9;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e2e2;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         text-align: center;
-        padding: 20px;
-        font-family: "72", Arial, Helvetica, sans-serif;
+        transition: all 0.3s ease;
+      }
+      .card:hover {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
       }
       .title {
-        font-size: 14px;
+        font-size: 0.875rem;
         color: #6a6d70;
-        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
       }
       .value {
-        font-size: 36px;
-        font-weight: bold;
+        font-size: 3rem;
+        font-weight: 700;
         color: #0070f2;
+        margin: 0;
+      }
+      .status {
+        font-size: 0.75rem;
+        color: #188918;
+        margin-top: 0.5rem;
+        font-weight: 600;
+      }
+      .no-data {
+        color: #bb0000;
+        font-style: italic;
       }
     </style>
     <div class="card">
-      <div class="title">Total Process Count</div>
+      <div id="widget-title" class="title">Process Counter</div>
       <div id="count-display" class="value">0</div>
+      <div id="status-text" class="status">Live from CDS</div>
     </div>
   `;
 
@@ -36,25 +54,35 @@
       super();
       this._shadowRoot = this.attachShadow({ mode: "open" });
       this._shadowRoot.appendChild(template.content.cloneNode(true));
+      this._props = {};
     }
 
-    // SAC calls this whenever the data in the story changes
+    // Called when the widget is added or properties change
     onCustomWidgetAfterUpdate(changedProperties) {
+      if (changedProperties["title"]) {
+        this._shadowRoot.getElementById("widget-title").textContent = changedProperties["title"];
+      }
       this.render();
     }
 
     render() {
       const display = this._shadowRoot.getElementById("count-display");
-      
-      // 'myDataBinding' refers to the ID set in the JSON file
-      const binding = this.myDataBinding;
+      const status = this._shadowRoot.getElementById("status-text");
 
-      if (binding && binding.data) {
-        // This counts every row returned by the CDS query
-        const rowCount = binding.data.length;
-        display.textContent = rowCount.toLocaleString();
+      // SAC binds the data to this.myData based on your JSON structure
+      const dataBinding = this.myData;
+
+      if (dataBinding && dataBinding.data) {
+        // Each entry in dataBinding.data represents a record from your CDS view
+        const totalRows = dataBinding.data.length;
+        
+        display.textContent = totalRows.toLocaleString();
+        status.textContent = "Total Records Loaded";
+        status.classList.remove("no-data");
       } else {
         display.textContent = "0";
+        status.textContent = "Waiting for data...";
+        status.classList.add("no-data");
       }
     }
   }
