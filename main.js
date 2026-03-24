@@ -106,13 +106,14 @@ class CCTRWidget extends HTMLElement {
     this._loadChartJs();
   }
 
-  _loadChartJs() {
+_loadChartJs() {
     if (window.Chart) { this._chartLib = window.Chart; return; }
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    s.src = 'https://reemehab.github.io/Sankey_Chart-/chart.min.js';
     s.onload = () => { this._chartLib = window.Chart; this._renderFromStore(); };
+    s.onerror = (e) => { this._log('Chart.js failed to load: ' + e); };
     document.head.appendChild(s);
-  }
+}
 
   // ── KEY METHOD: SAC calls this automatically when data changes ──
   onCustomWidgetAfterUpdate(changedProperties) {
