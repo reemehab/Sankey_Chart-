@@ -4,62 +4,60 @@
     <style>
       :host {
         display: block;
-        font-family: sans-serif;
+        padding: 1rem;
       }
-      .container {
-        padding: 20px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      .card {
+        background: #ffffff;
+        border-radius: 4px;
+        border: 1px solid #d9d9d9;
         text-align: center;
+        padding: 20px;
+        font-family: "72", Arial, Helvetica, sans-serif;
       }
-      .count {
-        font-size: 48px;
+      .title {
+        font-size: 14px;
+        color: #6a6d70;
+        margin-bottom: 10px;
+      }
+      .value {
+        font-size: 36px;
         font-weight: bold;
         color: #0070f2;
       }
-      .label {
-        color: #666;
-        font-size: 14px;
-        text-transform: uppercase;
-      }
     </style>
-    <div class="container">
-      <div class="label">Total Process Types</div>
-      <div id="process-count" class="count">0</div>
+    <div class="card">
+      <div class="title">Total Process Count</div>
+      <div id="count-display" class="value">0</div>
     </div>
   `;
 
-  class ProcessTypeWidget extends HTMLElement {
+  class ProcessCounter extends HTMLElement {
     constructor() {
       super();
       this._shadowRoot = this.attachShadow({ mode: "open" });
       this._shadowRoot.appendChild(template.content.cloneNode(true));
     }
 
-    // This is the key method SAC calls when data arrives
+    // SAC calls this whenever the data in the story changes
     onCustomWidgetAfterUpdate(changedProperties) {
       this.render();
     }
 
     render() {
-      const countEl = this._shadowRoot.getElementById("process-count");
+      const display = this._shadowRoot.getElementById("count-display");
       
-      // 'allRows' must match the ID in your JSON file's dataBindings
-      const dataBinding = this.allRows; 
+      // 'myDataBinding' refers to the ID set in the JSON file
+      const binding = this.myDataBinding;
 
-      if (dataBinding && dataBinding.data) {
-        // Map the rows and count unique process_type occurrences
-        // or simply count the total rows if each row is a process
-        const rows = dataBinding.data;
-        const totalCount = rows.length;
-        
-        countEl.textContent = totalCount;
+      if (binding && binding.data) {
+        // This counts every row returned by the CDS query
+        const rowCount = binding.data.length;
+        display.textContent = rowCount.toLocaleString();
       } else {
-        countEl.textContent = "No Data";
+        display.textContent = "0";
       }
     }
   }
 
-  customElements.define("com-sample-process-counter", ProcessTypeWidget);
+  customElements.define("com-sap-sample-processcounter", ProcessCounter);
 })();
