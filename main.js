@@ -1,9 +1,11 @@
+console.log("🔥 Widget JS Loaded");
+
 class TestWidget extends HTMLElement {
   connectedCallback() {
+    console.log("✅ Widget Rendered");
     this.innerHTML = `
-      <div style="padding:20px; font-family:Arial;">
-        <h2>✅ SAC Widget Works!</h2>
-        <p>If you see this, everything is configured correctly 🎉</p>
+      <div style="padding:20px">
+        <h2>It works 🎉</h2>
       </div>
     `;
   }
