@@ -29,12 +29,12 @@
         processData(sacData) {
             console.log("[WIDGET LOG] processData started.", sacData);
 
-            if (!sacData || !sacData.data || sacData.data.length === 0) {
-                console.warn("[WIDGET LOG] Empty SAC data.");
+            if (!sacData || sacData.state !== "success" || !sacData.data) {
+                console.warn("[WIDGET LOG] Data not ready yet.");
                 return;
             }
 
-            // ✅ FIXED DATA MAPPING
+            // ✅ Correct SAC mapping
             const formattedData = sacData.data.map((row, index) => {
                 const mappedRow = {
                     objectId: row.dimensions_0?.id || "Unknown",
@@ -71,7 +71,7 @@
                     "sap/viz/ui5/controls/VizFrame",
                     "sap/viz/ui5/data/FlattenedDataset",
                     "sap/viz/ui5/controls/common/feeds/FeedItem"
-                ], (XMLView, JSONModel) => {
+                ], (XMLView, JSONModel, VizFrame, FlattenedDataset, FeedItem) => {
 
                     console.log("[WIDGET LOG] UI5 libraries loaded.");
 
@@ -138,11 +138,31 @@
 
                         oView.placeAt(container);
 
-                        // ✅ Apply chart styling AFTER render
+                        // 🔥 FORCE VIZFRAME RENDER (CRITICAL FOR SAC)
                         setTimeout(() => {
                             const oChart = oView.byId("barChart");
+
                             if (oChart) {
-                                console.log("[WIDGET LOG] Applying viz properties.");
+                                console.log("[WIDGET LOG] Forcing VizFrame render...");
+
+                                const oDataset = oChart.getDataset();
+                                oChart.setDataset(null);
+                                oChart.setDataset(oDataset);
+
+                                oChart.setModel(oModel, "chartModel");
+
+                                oChart.removeAllFeeds();
+                                oChart.addFeed(new FeedItem({
+                                    uid: "categoryAxis",
+                                    type: "Dimension",
+                                    values: ["Object ID"]
+                                }));
+                                oChart.addFeed(new FeedItem({
+                                    uid: "valueAxis",
+                                    type: "Measure",
+                                    values: ["Call Records"]
+                                }));
+
                                 oChart.setVizProperties({
                                     plotArea: {
                                         dataLabel: { visible: true },
@@ -150,8 +170,14 @@
                                     },
                                     title: { visible: false }
                                 });
+
+                                oChart.invalidate(); // 🔥 magic
+
+                                console.log("[WIDGET LOG] Chart rendered successfully.");
+                            } else {
+                                console.error("[WIDGET LOG] Chart not found!");
                             }
-                        }, 300);
+                        }, 500);
 
                     }).catch(err => {
                         console.error("[WIDGET LOG] View creation failed:", err);
@@ -159,7 +185,6 @@
                 });
             };
 
-            // ✅ SAFE UI5 INIT
             if (sap.ui.getCore().isInitialized()) {
                 createView();
             } else {
