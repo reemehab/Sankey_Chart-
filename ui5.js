@@ -32,17 +32,16 @@
             if (!sacData || !sacData.data || sacData.data.length === 0) {
                 console.warn("[WIDGET LOG] Data is empty or malformed.");
                 return;
-            }
-
-            const formattedData = sacData.data.map((row, index) => {
+                        }
+                const formattedData = sacData.data.map((row, index) => {
                 const mappedRow = {
-                    objectId: (row.object_id) ? row.object_id.id : "Unknown", 
-                    callCount: (row.Call_Record) ? row.Call_Record.raw : 0
+                    objectId: row.dimensions_0?.id || "Unknown",
+                    callCount: row.measures_0?.raw || 0
                 };
-                // Log only the first row to avoid console clutter
+                
                 if(index === 0) console.log("[WIDGET LOG] Sample mapped row:", mappedRow);
                 return mappedRow;
-            });
+                });
 
             if (!this._ui5View) {
                 console.log("[WIDGET LOG] No UI5 View found. Initializing...");
