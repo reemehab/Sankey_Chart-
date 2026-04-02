@@ -2,7 +2,7 @@
     let template = document.createElement("template");
     template.innerHTML = `
         <style>
-            :host { display: block; width: 100%; height: 100%; }
+            :host { display: block; width: 100%; height: 800px; }
             #ui5_container { width: 100%; height: 100%; min-height: 500px; }
         </style>
         <div id="ui5_container"></div>
