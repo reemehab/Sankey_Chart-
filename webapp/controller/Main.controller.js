@@ -5,17 +5,16 @@ sap.ui.define([
 
     return Controller.extend("ae.test.SACBar.controller.Main", {
         onInit: function () {
-            var oChart = this.byId("barChart");
-            
-            // Set basic visual properties
-            oChart.setVizProperties({
-                plotArea: {
-                    colorPalette: ["#0070f2"],
-                    dataLabel: { visible: true }
-                },
-                title: { visible: false },
-                legend: { visible: false }
-            });
+            const oChart = this.byId("barChart");
+            if (oChart) {
+                oChart.setVizProperties({
+                    plotArea: {
+                        colorPalette: ["#2b7d2b"], // Forest green bars
+                        dataLabel: { visible: true }
+                    },
+                    title: { visible: false }
+                });
+            }
         }
     });
 });
