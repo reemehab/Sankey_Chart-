@@ -1,199 +1,106 @@
 (function () {
-    console.log("[WIDGET LOG] Script execution started.");
+    console.log("🚀 Script loaded");
 
-    let template = document.createElement("template");
-    template.innerHTML = `
-        <style>
-            :host { display: block; width: 100%; height: 100%; }
-        </style>
-        <div id="ui5_content" style="width: 100%; height: 100%;"></div>
-    `;
-
-    class SACWizardBar extends HTMLElement {
+    class WizardBar extends HTMLElement {
         constructor() {
             super();
-            console.log("[WIDGET LOG] Constructor called.");
+
             this._shadowRoot = this.attachShadow({ mode: "open" });
-            this._shadowRoot.appendChild(template.content.cloneNode(true));
-            this._ui5View = null;
+
+            this._shadowRoot.innerHTML = `
+                <div id="container" style="width:100%; height:500px;"></div>
+            `;
         }
 
-        onCustomWidgetAfterUpdate(changedProperties) {
-            console.log("[WIDGET LOG] onCustomWidgetAfterUpdate triggered.", changedProperties);
+        onCustomWidgetAfterUpdate(changedProps) {
+            console.log("[WIDGET] Update", changedProps);
 
-            if ("myData" in changedProperties) {
-                this.processData(this.myData);
+            if (changedProps.myData) {
+                this.processData(changedProps.myData);
             }
         }
 
-        processData(sacData) {
-            console.log("[WIDGET LOG] processData started.", sacData);
+        processData(myData) {
+            console.log("[WIDGET] processData", myData);
 
-            if (!sacData || sacData.state !== "success" || !sacData.data) {
-                console.warn("[WIDGET LOG] Data not ready yet.");
+            if (!myData || myData.state !== "success") {
+                console.log("⏳ waiting for data...");
                 return;
             }
 
-            // ✅ Correct SAC mapping
-            const formattedData = sacData.data.map((row, index) => {
-                const mappedRow = {
-                    objectId: row.dimensions_0?.id || "Unknown",
-                    callCount: row.measures_0?.raw || 0
-                };
+            const data = myData.data.map(row => ({
+                objectId: row["Object ID"]?.id || row["Object ID"],
+                callCount: Number(row["Call Count"]?.raw || row["Call Count"])
+            }));
 
-                if (index === 0) {
-                    console.log("[WIDGET LOG] Sample mapped row:", mappedRow);
-                }
+            console.log("✅ Data ready:", data.length);
 
-                return mappedRow;
-            });
-
-            if (!this._ui5View) {
-                this.initUI5(formattedData);
-            } else {
-                console.log("[WIDGET LOG] Updating model...");
-                const oModel = this._ui5View.getModel("chartModel");
-                if (oModel) {
-                    oModel.setProperty("/sales", formattedData);
-                }
-            }
+            this.renderChart(data);
         }
 
-        initUI5(data) {
-            console.log("[WIDGET LOG] initUI5 started.");
+        renderChart(data) {
+            const that = this;
 
-            const container = this._shadowRoot.getElementById("ui5_content");
-
-            const createView = () => {
+            sap.ui.getCore().attachInit(() => {
                 sap.ui.require([
-                    "sap/ui/core/mvc/XMLView",
                     "sap/ui/model/json/JSONModel",
                     "sap/viz/ui5/controls/VizFrame",
                     "sap/viz/ui5/data/FlattenedDataset",
                     "sap/viz/ui5/controls/common/feeds/FeedItem"
-                ], (XMLView, JSONModel, VizFrame, FlattenedDataset, FeedItem) => {
+                ], function (JSONModel, VizFrame, FlattenedDataset, FeedItem) {
 
-                    console.log("[WIDGET LOG] UI5 libraries loaded.");
+                    console.log("📊 Building chart...");
 
-                    XMLView.create({
-                        definition: `
-<mvc:View 
-    xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m"
-    xmlns:viz="sap.viz.ui5.controls"
-    xmlns:viz.data="sap.viz.ui5.data"
-    xmlns:viz.feeds="sap.viz.ui5.controls.common.feeds"
-    height="100%">
-
-    <VBox width="100%" height="100%" fitContainer="true">
-        
-        <Title text="Call Records by Object" level="H3" class="sapUiSmallMargin"/>
-
-        <viz:VizFrame 
-            id="barChart" 
-            vizType="bar" 
-            width="100%" 
-            height="100%">
-
-            <viz:dataset>
-                <viz.data:FlattenedDataset data="{chartModel>/sales}">
-                    <viz.data:dimensions>
-                        <viz.data:DimensionDefinition 
-                            name="Object ID" 
-                            value="{chartModel>objectId}"/>
-                    </viz.data:dimensions>
-                    <viz.data:measures>
-                        <viz.data:MeasureDefinition 
-                            name="Call Records" 
-                            value="{chartModel>callCount}"/>
-                    </viz.data:measures>
-                </viz.data:FlattenedDataset>
-            </viz:dataset>
-
-            <viz:feeds>
-                <viz.feeds:FeedItem 
-                    uid="categoryAxis" 
-                    type="Dimension" 
-                    values="Object ID"/>
-                <viz.feeds:FeedItem 
-                    uid="valueAxis" 
-                    type="Measure" 
-                    values="Call Records"/>
-            </viz:feeds>
-
-        </viz:VizFrame>
-
-    </VBox>
-</mvc:View>`
-                    }).then((oView) => {
-                        console.log("[WIDGET LOG] View created.");
-
-                        this._ui5View = oView;
-
-                        const oModel = new JSONModel({
-                            sales: data
-                        });
-
-                        oView.setModel(oModel, "chartModel");
-
-                        oView.placeAt(container);
-
-                        // 🔥 FORCE VIZFRAME RENDER (CRITICAL FOR SAC)
-                        setTimeout(() => {
-                            const oChart = oView.byId("barChart");
-
-                            if (oChart) {
-                                console.log("[WIDGET LOG] Forcing VizFrame render...");
-
-                                const oDataset = oChart.getDataset();
-                                oChart.setDataset(null);
-                                oChart.setDataset(oDataset);
-
-                                oChart.setModel(oModel, "chartModel");
-
-                                oChart.removeAllFeeds();
-                                oChart.addFeed(new FeedItem({
-                                    uid: "categoryAxis",
-                                    type: "Dimension",
-                                    values: ["Object ID"]
-                                }));
-                                oChart.addFeed(new FeedItem({
-                                    uid: "valueAxis",
-                                    type: "Measure",
-                                    values: ["Call Records"]
-                                }));
-
-                                oChart.setVizProperties({
-                                    plotArea: {
-                                        dataLabel: { visible: true },
-                                        colorPalette: ["#0070f2"]
-                                    },
-                                    title: { visible: false }
-                                });
-
-                                oChart.invalidate(); // 🔥 magic
-
-                                console.log("[WIDGET LOG] Chart rendered successfully.");
-                            } else {
-                                console.error("[WIDGET LOG] Chart not found!");
-                            }
-                        }, 500);
-
-                    }).catch(err => {
-                        console.error("[WIDGET LOG] View creation failed:", err);
+                    const oModel = new JSONModel({
+                        data: data
                     });
-                });
-            };
 
-            if (sap.ui.getCore().isInitialized()) {
-                createView();
-            } else {
-                sap.ui.getCore().attachInit(createView);
-            }
+                    const oDataset = new FlattenedDataset({
+                        dimensions: [{
+                            name: "Object ID",
+                            value: "{objectId}"
+                        }],
+                        measures: [{
+                            name: "Call Count",
+                            value: "{callCount}"
+                        }],
+                        data: {
+                            path: "/data"
+                        }
+                    });
+
+                    const oVizFrame = new VizFrame({
+                        vizType: "column",
+                        width: "100%",
+                        height: "500px"
+                    });
+
+                    oVizFrame.setDataset(oDataset);
+                    oVizFrame.setModel(oModel);
+
+                    oVizFrame.addFeed(new FeedItem({
+                        uid: "valueAxis",
+                        type: "Measure",
+                        values: ["Call Count"]
+                    }));
+
+                    oVizFrame.addFeed(new FeedItem({
+                        uid: "categoryAxis",
+                        type: "Dimension",
+                        values: ["Object ID"]
+                    }));
+
+                    // 💥 الحل السحري هنا
+                    setTimeout(() => {
+                        oVizFrame.placeAt(that._shadowRoot.getElementById("container"));
+                        oVizFrame.rerender();
+                        console.log("🔥 Chart FORCED to render");
+                    }, 0);
+
+                });
+            });
         }
     }
 
-    console.log("[WIDGET LOG] Defining custom element.");
-    customElements.define("sac-wizard-bar", SACWizardBar);
-
+    customElements.define("sac-wizard-bar", WizardBar);
 })();
