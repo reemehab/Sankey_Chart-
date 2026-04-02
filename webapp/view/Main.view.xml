@@ -4,7 +4,6 @@
     xmlns:mvc="sap.ui.core.mvc" 
     xmlns:m="sap.m"
     xmlns:form="sap.ui.layout.form" 
-    xmlns:core="sap.ui.core"
     xmlns:viz="sap.viz.ui5.controls"
     xmlns:viz.feeds="sap.viz.ui5.controls.common.feeds"
     xmlns:viz.data="sap.viz.ui5.data"
@@ -14,94 +13,50 @@
         <pages>
             <Page id="wizardContentPage" showHeader="false">
                 <content>
-
-                    <Title text="Monthly Sales Bar Chart" level="H2" class="sapUiMediumMarginTop sapUiSmallMarginBegin"/>
-
-                    <Wizard id="CreateProductWizard" class="sapUiResponsivePadding--header sapUiResponsivePadding--content" complete="wizardCompletedHandler">
-                        
-                        <WizardStep id="ChartStep" title="Revenue Overview" validated="true" activate="onStepActivate">
-                            <VBox class="sapUiMediumMargin">
-                                <m:Title
-                                    text="Revenue Overview — Q1/Q2 2026"
-                                    level="H3"
-                                    class="sapUiSmallMarginBottom"/>
-
-                                <m:Text
-                                    text="Monthly revenue by period. Click a bar to see details."
-                                    class="sapUiTinyMarginBottom"
-                                    wrapping="true"/>
-
-                                <viz:VizFrame
-                                    id="barChart"
-                                    vizType="bar"
-                                    width="100%"
-                                    height="400px">
-                                    <viz:dataset>
-                                        <viz.data:FlattenedDataset data="{chartModel>/sales}">
-                                            <viz.data:dimensions>
-                                                <viz.data:DimensionDefinition name="Month" value="{chartModel>month}"/>
-                                            </viz.data:dimensions>
-                                            <viz.data:measures>
-                                                <viz.data:MeasureDefinition name="Revenue" value="{chartModel>revenue}"/>
-                                            </viz.data:measures>
-                                        </viz.data:FlattenedDataset>
-                                    </viz:dataset>
-                                    <viz:feeds>
-                                        <viz.feeds:FeedItem uid="categoryAxis" type="Dimension" values="Month"/>
-                                        <viz.feeds:FeedItem uid="valueAxis" type="Measure" values="Revenue"/>
-                                    </viz:feeds>
-                                </viz:VizFrame>
-                            </VBox>
-                        </WizardStep>
-
-                        <WizardStep id="DetailsStep" title="Selection Details" validated="true" activate="onStepActivate">
-                            <VBox class="sapUiSmallMargin">
-                                <m:Panel
-                                    id="selectionPanel"
-                                    headerText="Selected Bar Details"
-                                    visible="true"
-                                    class="sapUiSmallMarginTop">
-                                    <m:content>
-                                        <form:SimpleForm editable="false" layout="ResponsiveGridLayout">
-                                            <form:content>
-                                                <Label text="Selected Month"/>
-                                                <Text id="selectedMonth" text="—"/>
-                                                <Label text="Revenue Amount"/>
-                                                <Text id="selectedRevenue" text="—"/>
-                                            </form:content>
-                                        </form:SimpleForm>
-                                        <m:Button text="Clear Selection" type="Transparent" press=".onClearSelection"/>
-                                    </m:content>
+                    <ScrollContainer height="100%" vertical="true" horizontal="false">
+                        <Wizard id="CreateProductWizard" complete="onWizardCompleted">
+                            <WizardStep id="ChartStep" title="Revenue Overview" validated="true">
+                                <VBox class="sapUiMediumMargin">
+                                    <m:Title text="Monthly Revenue — 2026" level="H3"/>
+                                    <viz:VizFrame id="barChart" vizType="bar" width="100%" height="450px">
+                                        <viz:dataset>
+                                            <viz.data:FlattenedDataset data="{chartModel>/sales}">
+                                                <viz.data:dimensions>
+                                                    <viz.data:DimensionDefinition name="Month" value="{chartModel>month}"/>
+                                                </viz.data:dimensions>
+                                                <viz.data:measures>
+                                                    <viz.data:MeasureDefinition name="Revenue" value="{chartModel>revenue}"/>
+                                                </viz.data:measures>
+                                            </viz.data:FlattenedDataset>
+                                        </viz:dataset>
+                                        <viz:feeds>
+                                            <viz.feeds:FeedItem uid="categoryAxis" type="Dimension" values="Month"/>
+                                            <viz.feeds:FeedItem uid="valueAxis" type="Measure" values="Revenue"/>
+                                        </viz:feeds>
+                                    </viz:VizFrame>
+                                </VBox>
+                            </WizardStep>
+                            <WizardStep id="DetailsStep" title="Details" validated="true">
+                                <m:Panel id="selectionPanel" headerText="Selection Details">
+                                    <form:SimpleForm editable="false" layout="ResponsiveGridLayout">
+                                        <m:Label text="Month"/>
+                                        <m:Text id="selectedMonth" text="—"/>
+                                        <m:Label text="Revenue"/>
+                                        <m:Text id="selectedRevenue" text="—"/>
+                                    </form:SimpleForm>
                                 </m:Panel>
-                            </VBox>
-                        </WizardStep>
-
-                    </Wizard>
+                            </WizardStep>
+                            <WizardStep id="ConfirmStep" title="Confirm" validated="true">
+                                <m:Text text="Ready to export data?"/>
+                            </WizardStep>
+                        </Wizard>
+                    </ScrollContainer>
                 </content>
                 <footer>
                     <OverflowToolbar>
                         <ToolbarSpacer/>
-                        <ToolbarSeparator />
-                        <m:Button text="Back" type="Default" press="onBackButton"/>
-                        <m:Button text="Next" type="Accept" press="onNextButton"/>
+                        <Button text="Next" type="Emphasized" press="onNextStep"/>
                     </OverflowToolbar>
-                </footer>
-            </Page>
-
-            <Page id="wizardReviewPage" showHeader="false">
-                <content>
-                    <VBox class="sapUiSmallMargin sapUiMediumMarginTop">
-                        <Title text="Final Review" level="H3"/>
-                        <m:Text text="Please confirm the data before exporting or submitting." class="sapUiSmallMarginBottom"/>
-                        </VBox>
-                </content>
-                <footer>
-                    <Bar>
-                        <contentRight>
-                            <Button text="Back" press="backToWizardContent"/>
-                            <Button text="Cancel" type="Reject" press="handleWizardCancel"/>
-                        </contentRight>
-                    </Bar>
                 </footer>
             </Page>
         </pages>
