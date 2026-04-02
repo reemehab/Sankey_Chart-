@@ -95,7 +95,6 @@
                         definition: `
 <mvc:View 
     height="100%" 
-    controllerName="ae.test.SACBar.controller.Main" 
     xmlns:mvc="sap.ui.core.mvc" 
     xmlns:viz="sap.viz.ui5.controls"
     xmlns:viz.feeds="sap.viz.ui5.controls.common.feeds"
