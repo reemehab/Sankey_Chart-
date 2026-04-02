@@ -81,7 +81,6 @@
                 <footer>
                     <OverflowToolbar>
                         <ToolbarSpacer/>
-                        <m:Button text="Refresh Data" icon="sap-icon://refresh" press=".onRefresh" type="Ghost"/>
                         <ToolbarSeparator />
                         <m:Button text="Back" type="Default" press="onBackButton"/>
                         <m:Button text="Next" type="Accept" press="onNextButton"/>
@@ -100,7 +99,6 @@
                     <Bar>
                         <contentRight>
                             <Button text="Back" press="backToWizardContent"/>
-                            <Button text="Export Report" icon="sap-icon://download" type="Accept" press=".onExport"/>
                             <Button text="Cancel" type="Reject" press="handleWizardCancel"/>
                         </contentRight>
                     </Bar>
