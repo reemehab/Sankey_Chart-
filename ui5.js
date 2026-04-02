@@ -53,7 +53,9 @@
                 
                 sap.ui.require([
                     "sap/ui/core/mvc/XMLView",
-                    "sap/ui/model/json/JSONModel"
+                    "sap/ui/model/json/JSONModel",
+                    "sap/viz/ui5/controls/VizFrame", // FORCE LOAD VIZ
+                    "sap/viz/ui5/data/FlattenedDataset" // FORCE LOAD DATASET
                 ], (XMLView, JSONModel) => {
                     const oModel = new JSONModel({ sales: initialData });
 
