@@ -2,13 +2,13 @@
     let template = document.createElement("template");
     template.innerHTML = `
         <style>
-            :host { display: block; width: 100%; height: 800px; }
-            #ui5_container { width: 100%; height: 100%; }
+            :host { display: block; width: 100%; height: 500px; }
+            #ui5_container { width: 100%; height: 100%; min-height: 500px; }
         </style>
         <div id="ui5_container" class="sapUiSizeCompact"></div>
     `;
 
-    class SACWizardBar extends HTMLElement {
+    class SACBarOnly extends HTMLElement {
         constructor() {
             super();
             this._shadowRoot = this.attachShadow({ mode: "open" });
@@ -17,13 +17,13 @@
         }
 
         onCustomWidgetAfterUpdate(changedProperties) {
-            if (changedProperties["myData"] && changedProperties["myData"].data) {
+            if (changedProperties["myData"]) {
                 this.processData(changedProperties["myData"]);
             }
         }
 
         processData(sacData) {
-            if (!sacData.data || sacData.data.length === 0) return;
+            if (!sacData || !sacData.data) return;
 
             const formattedData = sacData.data.map(row => ({
                 month: (row.dimensions && row.dimensions[0]) ? row.dimensions[0].label : "Unknown",
@@ -31,7 +31,8 @@
             }));
 
             if (!this._ui5View) {
-                this.initUI5(formattedData);
+                // Delay initialization slightly to ensure Shadow DOM is ready
+                setTimeout(() => { this.initUI5(formattedData); }, 100);
             } else {
                 const oModel = this._ui5View.getModel("chartModel");
                 if (oModel) oModel.setProperty("/sales", formattedData);
@@ -49,9 +50,7 @@
 
                 sap.ui.require([
                     "sap/ui/core/mvc/XMLView",
-                    "sap/ui/model/json/JSONModel",
-                    "sap/viz/ui5/controls/VizFrame",
-                    "sap/viz/ui5/data/FlattenedDataset"
+                    "sap/ui/model/json/JSONModel"
                 ], (XMLView, JSONModel) => {
                     const oModel = new JSONModel({ sales: initialData });
 
@@ -60,15 +59,11 @@
                     }).then((oView) => {
                         this._ui5View = oView;
                         oView.setModel(oModel, "chartModel");
-                        
-                        // requestAnimationFrame prevents the querySelectorAll null error
-                        window.requestAnimationFrame(() => {
-                            oView.placeAt(container);
-                        });
-                    }).catch(err => console.error("View Load Error:", err));
+                        oView.placeAt(container);
+                    }).catch(err => console.error("UI5 View Load Error:", err));
                 });
             });
         }
     }
-    customElements.define("sac-wizard-bar", SACWizardBar);
+    customElements.define("sac-wizard-bar", SACBarOnly);
 })();
