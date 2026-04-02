@@ -6,14 +6,11 @@ processData(sacData) {
         return;
     }
 
-    // MAP THE CDS FIELDS HERE
     const formattedData = sacData.data.map(row => {
-        // SAC usually nests these under dimensions/measures 
-        // using the technical ID from your CDS/Model
         return {
-            // Check your console log for the exact key name if these don't work:
-            id: (row.object_id) ? row.object_id.id : "Unknown", 
-            calls: (row.Call_Record) ? row.Call_Record.raw : 0
+            // Mapping CDS fields to internal model keys
+            objectId: (row.object_id) ? row.object_id.id : "Unknown", 
+            callCount: (row.Call_Record) ? row.Call_Record.raw : 0
         };
     });
     
