@@ -3,7 +3,7 @@
     template.innerHTML = `
         <style>
             :host { display: block; width: 100%; height: 100%; }
-            #ui5_container { width: 100%; height: 100%; overflow: hidden; }
+            #ui5_container { width: 100%; height: 100%; min-height: 500px; }
         </style>
         <div id="ui5_container"></div>
     `;
@@ -16,18 +16,16 @@
             this._ui5View = null;
         }
 
-        // Called whenever data changes in the SAC Story
         onCustomWidgetAfterUpdate(changedProperties) {
-            if (changedProperties["myDataBinding"]) {
-                this.updateUI5Data(changedProperties["myDataBinding"]);
+            // FIXED: Matches "myData" from your JSON
+            if (changedProperties["myData"]) {
+                this.updateUI5Data(changedProperties["myData"]);
             }
         }
 
         updateUI5Data(sacData) {
             if (!sacData || !sacData.data) return;
 
-            // Map SAC structure to your UI5 Model structure
-            // dimensions[0] = ObjectId | measures[0] = Call Record
             const formattedData = sacData.data.map(row => ({
                 month: row.dimensions[0].label, 
                 revenue: row.measures[0].raw
@@ -47,20 +45,18 @@
             const container = this._shadowRoot.getElementById("ui5_container");
 
             sap.ui.getCore().attachInit(() => {
-            sap.ui.loader.config({
-            paths: {
-                "ae/test/SACBar": "https://reemehab.github.io/Sankey_Chart-/webapp"
-            }
-        });
+                sap.ui.loader.config({
+                    paths: {
+                        "ae/test/SACBar": "https://reemehab.github.io/Sankey_Chart-/webapp"
+                    }
+                });
                 
                 sap.ui.require([
                     "sap/ui/core/mvc/XMLView",
                     "sap/ui/model/json/JSONModel"
                 ], (XMLView, JSONModel) => {
-                    
                     const oModel = new JSONModel({ sales: initialData });
 
-                    // Load your XML View (ensure the path to your .view.xml is correct)
                     XMLView.create({
                         viewName: "ae.test.SACBar.view.Main" 
                     }).then((oView) => {
