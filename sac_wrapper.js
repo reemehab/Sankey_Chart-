@@ -47,6 +47,12 @@
             const container = this._shadowRoot.getElementById("ui5_container");
 
             sap.ui.getCore().attachInit(() => {
+            sap.ui.loader.config({
+            paths: {
+                "ae/test/SACBar": "https://reemehab.github.io/Sankey_Chart-/webapp"
+            }
+        });
+                
                 sap.ui.require([
                     "sap/ui/core/mvc/XMLView",
                     "sap/ui/model/json/JSONModel"
