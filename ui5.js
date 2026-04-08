@@ -4,120 +4,154 @@
     class WizardBar extends HTMLElement {
         constructor() {
             super();
-            // Light DOM — SAP UI5 placeAt() needs document.getElementById to work
             this._containerId = "sac-wbar-" + Math.random().toString(36).slice(2, 9);
-            const div = document.createElement("div");
-            div.id = this._containerId;
-            div.style.cssText = "width:100%;height:500px;";
-            this.appendChild(div);
-            this._chartBuilt = false;
-        }
+            this._chartId     = "sac-chart-" + Math.random().toString(36).slice(2, 9);
 
-        onCustomWidgetAfterUpdate(changedProps) {
-            console.log("[WIDGET] Update — full changedProps:", JSON.stringify({
-                keys: Object.keys(changedProps),
-                myData_direct: changedProps.myData
-                    ? { state: changedProps.myData.state }
-                    : "absent",
-                dataBindings_myData: changedProps.dataBindings?.myData
-                    ? { state: changedProps.dataBindings.myData.state }
-                    : "absent"
-            }));
-
-            // SAC passes myData DIRECTLY on changedProps (not nested under dataBindings)
-            // dataBindings is an internal SAC proxy — do not read data from it
-            const myData = changedProps.myData;
-            if (myData) {
-                this.processData(myData);
+            // Inject styles into document head (once)
+            if (!document.getElementById("sac-wizard-styles")) {
+                const style = document.createElement("style");
+                style.id = "sac-wizard-styles";
+                style.textContent = `
+                    .sac-widget-wrap    { font-family: Arial, sans-serif; width: 100%; }
+                    .sac-navbar         { display: flex; align-items: center; gap: 8px;
+                                          background: #0a6ed1; padding: 10px 16px;
+                                          border-radius: 6px 6px 0 0; }
+                    .sac-navbar-title   { color: #fff; font-size: 15px; font-weight: 600;
+                                          flex: 1; margin: 0; }
+                    .sac-navbar-btn     { background: rgba(255,255,255,0.15); border: none;
+                                          color: #fff; padding: 5px 12px; border-radius: 4px;
+                                          cursor: pointer; font-size: 12px; }
+                    .sac-navbar-btn:hover { background: rgba(255,255,255,0.28); }
+                    .sac-navbar-badge   { background: #fff; color: #0a6ed1; border-radius: 10px;
+                                          padding: 2px 8px; font-size: 11px; font-weight: 700; }
+                    .sac-chart-area     { width: 100%; height: 460px; }
+                `;
+                document.head.appendChild(style);
             }
+
+            // Build the HTML structure
+            this.innerHTML = `
+                <div class="sac-widget-wrap" id="${this._containerId}">
+
+                    <!-- ① Navbar -->
+                    <nav class="sac-navbar">
+                        <span class="sac-navbar-title">Object Call Analysis</span>
+                        <span class="sac-navbar-badge" id="${this._containerId}-count">0 records</span>
+                        <button class="sac-navbar-btn" id="${this._containerId}-refresh">↻ Refresh</button>
+                        <button class="sac-navbar-btn" id="${this._containerId}-export">↓ Export</button>
+                    </nav>
+
+                    <!-- ② Chart container (UI5 renders here) -->
+                    <div class="sac-chart-area" id="${this._chartId}"></div>
+
+                </div>
+            `;
+
+            // Wire up navbar button events
+            this.querySelector(`#${this._containerId}-refresh`)
+                .addEventListener("click", () => this._onRefresh());
+            this.querySelector(`#${this._containerId}-export`)
+                .addEventListener("click", () => this._onExport());
         }
 
-        processData(myData) {
-            const container = document.getElementById(this._containerId);
+        // ─── Navbar button handlers ───────────────────────────────────────────
+        _onRefresh() {
+            const chartArea = document.getElementById(this._chartId);
+            if (chartArea) chartArea.innerHTML =
+                '<div style="padding:20px;color:#666">↻ Refreshing...</div>';
+            // SAC will call onCustomWidgetAfterUpdate again automatically
+            // when filters/data change — this button is just a visual cue.
+            // If you want to force a re-render, call this._lastData and re-render:
+            if (this._lastData) this.renderChart(this._lastData);
+        }
 
-            // Always show state for debugging
-            console.log("[WIDGET] processData — state:", myData?.state);
+        _onExport() {
+            if (!this._lastData || !this._lastData.length) return;
+            // Build a simple CSV and trigger download
+            const csv = "Object ID,Call Count\n" +
+                this._lastData.map(r => `"${r.objectId}",${r.callCount}`).join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement("a");
+            a.href = url; a.download = "call_analysis.csv"; a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ─── SAC lifecycle hook ───────────────────────────────────────────────
+        onCustomWidgetAfterUpdate(changedProps) {
+            console.log("[WIDGET] Update — state:",
+                changedProps.myData?.state ?? "no myData");
+            const myData = changedProps.myData;
+            if (myData) this.processData(myData);
+        }
+
+        // ─── Data processing ──────────────────────────────────────────────────
+        processData(myData) {
+            const chartArea = document.getElementById(this._chartId);
+            const badge     = document.getElementById(`${this._containerId}-count`);
 
             if (!myData || myData.state === "loading") {
-                if (container) container.innerHTML =
-                    '<div style="padding:20px;color:#666;font-family:sans-serif">⏳ Loading data...</div>';
+                if (chartArea) chartArea.innerHTML =
+                    '<div style="padding:20px;color:#666">⏳ Loading data...</div>';
                 return;
             }
 
-            // Visible error — show the message so you can diagnose the model issue
             if (myData.state === "error") {
-                const msgs = (myData.messages || []).map(m => m.message || JSON.stringify(m)).join("; ");
-                console.error("[WIDGET] Data error:", msgs, myData);
-                if (container) container.innerHTML =
-                    `<div style="padding:20px;color:#c00;font-family:sans-serif;font-size:13px">
-                        <b>Data binding error</b><br>${msgs || "Unknown error — check model connection and dimension/measure assignment in SAC"}
+                const msgs = (myData.messages || [])
+                    .map(m => m.message || JSON.stringify(m)).join("; ");
+                console.error("[WIDGET] Data error:", msgs);
+                if (chartArea) chartArea.innerHTML =
+                    `<div style="padding:20px;color:#c00;font-size:13px">
+                        <b>Data binding error</b><br>
+                        ${msgs || "Check model connection and dimension/measure feeds in SAC"}
                     </div>`;
                 return;
             }
 
-            if (myData.state !== "success") {
-                console.warn("[WIDGET] Unexpected state:", myData.state);
+            if (myData.state !== "success" || !myData.data?.length) {
+                if (chartArea) chartArea.innerHTML =
+                    '<div style="padding:20px;color:#666">No data returned.</div>';
                 return;
             }
 
-            if (!myData.data || myData.data.length === 0) {
-                if (container) container.innerHTML =
-                    '<div style="padding:20px;color:#666;font-family:sans-serif">No data returned.</div>';
-                return;
-            }
+            // Log keys so you can verify what SAC sends
+            console.log("[WIDGET] First row:", myData.data[0]);
 
-            // Log first row so you can see the EXACT key names SAC uses
-            console.log("[WIDGET] First row keys:", Object.keys(myData.data[0]));
-            console.log("[WIDGET] First row sample:", myData.data[0]);
-
-            /*
-             * SAC row keys: SAC uses the feed `id` from your JSON as the key.
-             * Your JSON has:
-             *   { "id": "dimensions", "type": "dimension" }
-             *   { "id": "measures",   "type": "mainStructureMember" }
-             *
-             * So row keys will be something like:
-             *   row["dimensions_0"] or row["dimensions"] → dimension member object
-             *   row["measures_0"]   or row["measures"]   → measure value object
-             *
-             * The console log above will tell you the EXACT keys.
-             * Update the two lines below if needed.
-             */
             const firstRow = myData.data[0];
             const allKeys  = Object.keys(firstRow);
-
-            // Heuristic: dimension member objects have a `.label` or `.id` property
-            const dimKey   = allKeys.find(k => firstRow[k]?.label !== undefined || firstRow[k]?.id !== undefined);
-            // Heuristic: measure value objects have a `.raw` number property
-            const measKey  = allKeys.find(k => typeof firstRow[k]?.raw === "number" || typeof firstRow[k] === "number");
-
-            console.log("[WIDGET] Detected dimKey:", dimKey, "measKey:", measKey);
+            const dimKey   = allKeys.find(k =>
+                firstRow[k]?.label !== undefined || firstRow[k]?.id !== undefined);
+            const measKey  = allKeys.find(k =>
+                typeof firstRow[k]?.raw === "number" || typeof firstRow[k] === "number");
 
             if (!dimKey || !measKey) {
-                container.innerHTML =
-                    `<div style="padding:20px;color:#c00;font-family:sans-serif;font-size:13px">
-                        Could not detect dimension/measure keys.<br>
-                        Row keys found: <b>${allKeys.join(", ")}</b><br>
-                        Check the console for the full first-row dump.
+                if (chartArea) chartArea.innerHTML =
+                    `<div style="padding:20px;color:#c00;font-size:13px">
+                        Could not detect keys.<br>Keys found: <b>${allKeys.join(", ")}</b>
                     </div>`;
                 return;
             }
 
             const data = myData.data.map(row => ({
-                objectId:  row[dimKey]?.label  || row[dimKey]?.id  || String(row[dimKey]),
+                objectId:  row[dimKey]?.label || row[dimKey]?.id || String(row[dimKey]),
                 callCount: typeof row[measKey] === "number"
                     ? row[measKey]
                     : Number(row[measKey]?.raw ?? row[measKey]?.formatted ?? 0)
             }));
 
-            console.log("✅ Data ready:", data.length, "rows. Sample:", data[0]);
+            // Update badge with record count
+            if (badge) badge.textContent = `${data.length} records`;
+
+            // Cache data for export and refresh
+            this._lastData = data;
+            console.log("✅ Data ready:", data.length, "rows");
             this.renderChart(data);
         }
 
+        // ─── UI5 chart rendering ──────────────────────────────────────────────
         renderChart(data) {
-            const containerId = this._containerId;
+            const chartId = this._chartId;
 
-            // Prevent duplicate charts on repeated updates
             if (this._vizFrame) {
                 try { this._vizFrame.destroy(); } catch (e) {}
                 this._vizFrame = null;
@@ -134,25 +168,29 @@
                 const oModel = new JSONModel({ data });
 
                 const oDataset = new FlattenedDataset({
-                    dimensions: [{ name: "Object ID",   value: "{objectId}"  }],
-                    measures:   [{ name: "Call Count",  value: "{callCount}" }],
+                    dimensions: [{ name: "Object ID",  value: "{objectId}"  }],
+                    measures:   [{ name: "Call Count", value: "{callCount}" }],
                     data: { path: "/data" }
                 });
 
                 const oVizFrame = new VizFrame({
                     vizType: "column",
                     width:   "100%",
-                    height:  "480px"
+                    height:  "450px"
                 });
 
                 oVizFrame.setDataset(oDataset);
                 oVizFrame.setModel(oModel);
-                oVizFrame.addFeed(new FeedItem({ uid: "valueAxis",    type: "Measure",    values: ["Call Count"] }));
-                oVizFrame.addFeed(new FeedItem({ uid: "categoryAxis", type: "Dimension",  values: ["Object ID"]  }));
+                oVizFrame.addFeed(new FeedItem({
+                    uid: "valueAxis", type: "Measure", values: ["Call Count"]
+                }));
+                oVizFrame.addFeed(new FeedItem({
+                    uid: "categoryAxis", type: "Dimension", values: ["Object ID"]
+                }));
 
                 this._vizFrame = oVizFrame;
-                oVizFrame.placeAt(containerId);
-                console.log("🔥 Chart placed at #" + containerId);
+                oVizFrame.placeAt(chartId);
+                console.log("🔥 Chart placed at #" + chartId);
             });
         }
     }
