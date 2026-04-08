@@ -4,69 +4,138 @@
     class WizardBar extends HTMLElement {
         constructor() {
             super();
-            // Bug 4 fix: don't use Shadow DOM — placeAt() can't target shadow roots.
-            // Use a regular light DOM container so SAP UI5 can find it by ID.
-            this._containerId = "sac-wizard-bar-" + Math.random().toString(36).slice(2);
+            // Light DOM — SAP UI5 placeAt() needs document.getElementById to work
+            this._containerId = "sac-wbar-" + Math.random().toString(36).slice(2, 9);
             const div = document.createElement("div");
             div.id = this._containerId;
             div.style.cssText = "width:100%;height:500px;";
             this.appendChild(div);
+            this._chartBuilt = false;
         }
 
-        // Bug 1 fix: changedProps is the full widget object.
-        // The data binding lives under changedProps.dataBindings.myData
         onCustomWidgetAfterUpdate(changedProps) {
-            console.log("[WIDGET] Update", changedProps);
-            const myData = changedProps?.dataBindings?.myData;
+            console.log("[WIDGET] Update — full changedProps:", JSON.stringify({
+                keys: Object.keys(changedProps),
+                myData_direct: changedProps.myData
+                    ? { state: changedProps.myData.state }
+                    : "absent",
+                dataBindings_myData: changedProps.dataBindings?.myData
+                    ? { state: changedProps.dataBindings.myData.state }
+                    : "absent"
+            }));
+
+            // SAC passes myData DIRECTLY on changedProps (not nested under dataBindings)
+            // dataBindings is an internal SAC proxy — do not read data from it
+            const myData = changedProps.myData;
             if (myData) {
                 this.processData(myData);
             }
         }
 
         processData(myData) {
-            console.log("[WIDGET] processData", myData);
-            if (!myData || myData.state !== "success") {
-                console.log("⏳ waiting for data...");
+            const container = document.getElementById(this._containerId);
+
+            // Always show state for debugging
+            console.log("[WIDGET] processData — state:", myData?.state);
+
+            if (!myData || myData.state === "loading") {
+                if (container) container.innerHTML =
+                    '<div style="padding:20px;color:#666;font-family:sans-serif">⏳ Loading data...</div>';
                 return;
             }
 
-            // Bug 2 fix: SAC row keys match the feed `id` from your JSON ("dimensions", "measures"),
-            // not the feed `description`. Log the first row to confirm key names in your environment.
-            console.log("🔍 Sample row:", myData.data[0]);
+            // Visible error — show the message so you can diagnose the model issue
+            if (myData.state === "error") {
+                const msgs = (myData.messages || []).map(m => m.message || JSON.stringify(m)).join("; ");
+                console.error("[WIDGET] Data error:", msgs, myData);
+                if (container) container.innerHTML =
+                    `<div style="padding:20px;color:#c00;font-family:sans-serif;font-size:13px">
+                        <b>Data binding error</b><br>${msgs || "Unknown error — check model connection and dimension/measure assignment in SAC"}
+                    </div>`;
+                return;
+            }
 
-            const data = myData.data.map(row => {
-                // Dimension member: try the feed id "dimensions" first, fallback to index 0
-                const dimKey   = Object.keys(row).find(k => !["measures","Call Count","callCount"].includes(k)) || "dimensions";
-                const measKey  = Object.keys(row).find(k => ["measures","Call Count","callCount"].includes(k)) || "measures";
+            if (myData.state !== "success") {
+                console.warn("[WIDGET] Unexpected state:", myData.state);
+                return;
+            }
 
-                const objectId  = row[dimKey]?.label  || row[dimKey]?.id  || row[dimKey]  || String(dimKey);
-                const callCount = Number(row[measKey]?.raw ?? row[measKey] ?? 0);
-                return { objectId, callCount };
-            });
+            if (!myData.data || myData.data.length === 0) {
+                if (container) container.innerHTML =
+                    '<div style="padding:20px;color:#666;font-family:sans-serif">No data returned.</div>';
+                return;
+            }
 
-            console.log("✅ Data ready:", data.length, data[0]);
+            // Log first row so you can see the EXACT key names SAC uses
+            console.log("[WIDGET] First row keys:", Object.keys(myData.data[0]));
+            console.log("[WIDGET] First row sample:", myData.data[0]);
+
+            /*
+             * SAC row keys: SAC uses the feed `id` from your JSON as the key.
+             * Your JSON has:
+             *   { "id": "dimensions", "type": "dimension" }
+             *   { "id": "measures",   "type": "mainStructureMember" }
+             *
+             * So row keys will be something like:
+             *   row["dimensions_0"] or row["dimensions"] → dimension member object
+             *   row["measures_0"]   or row["measures"]   → measure value object
+             *
+             * The console log above will tell you the EXACT keys.
+             * Update the two lines below if needed.
+             */
+            const firstRow = myData.data[0];
+            const allKeys  = Object.keys(firstRow);
+
+            // Heuristic: dimension member objects have a `.label` or `.id` property
+            const dimKey   = allKeys.find(k => firstRow[k]?.label !== undefined || firstRow[k]?.id !== undefined);
+            // Heuristic: measure value objects have a `.raw` number property
+            const measKey  = allKeys.find(k => typeof firstRow[k]?.raw === "number" || typeof firstRow[k] === "number");
+
+            console.log("[WIDGET] Detected dimKey:", dimKey, "measKey:", measKey);
+
+            if (!dimKey || !measKey) {
+                container.innerHTML =
+                    `<div style="padding:20px;color:#c00;font-family:sans-serif;font-size:13px">
+                        Could not detect dimension/measure keys.<br>
+                        Row keys found: <b>${allKeys.join(", ")}</b><br>
+                        Check the console for the full first-row dump.
+                    </div>`;
+                return;
+            }
+
+            const data = myData.data.map(row => ({
+                objectId:  row[dimKey]?.label  || row[dimKey]?.id  || String(row[dimKey]),
+                callCount: typeof row[measKey] === "number"
+                    ? row[measKey]
+                    : Number(row[measKey]?.raw ?? row[measKey]?.formatted ?? 0)
+            }));
+
+            console.log("✅ Data ready:", data.length, "rows. Sample:", data[0]);
             this.renderChart(data);
         }
 
         renderChart(data) {
             const containerId = this._containerId;
 
-            // Bug 3 fix: don't use attachInit — UI5 is already running inside SAC.
-            // Call sap.ui.require directly. It fires synchronously if the modules are cached,
-            // or asynchronously once loaded — either way it will not miss the boot.
+            // Prevent duplicate charts on repeated updates
+            if (this._vizFrame) {
+                try { this._vizFrame.destroy(); } catch (e) {}
+                this._vizFrame = null;
+            }
+
             sap.ui.require([
                 "sap/ui/model/json/JSONModel",
                 "sap/viz/ui5/controls/VizFrame",
                 "sap/viz/ui5/data/FlattenedDataset",
                 "sap/viz/ui5/controls/common/feeds/FeedItem"
-            ], function (JSONModel, VizFrame, FlattenedDataset, FeedItem) {
-                console.log("📊 Building chart...");
+            ], (JSONModel, VizFrame, FlattenedDataset, FeedItem) => {
+                console.log("📊 Building VizFrame...");
 
-                const oModel = new JSONModel({ data: data });
+                const oModel = new JSONModel({ data });
 
                 const oDataset = new FlattenedDataset({
-                    dimensions: [{ name: "Object ID", value: "{objectId}" }],
-                    measures:   [{ name: "Call Count", value: "{callCount}" }],
+                    dimensions: [{ name: "Object ID",   value: "{objectId}"  }],
+                    measures:   [{ name: "Call Count",  value: "{callCount}" }],
                     data: { path: "/data" }
                 });
 
@@ -78,22 +147,12 @@
 
                 oVizFrame.setDataset(oDataset);
                 oVizFrame.setModel(oModel);
+                oVizFrame.addFeed(new FeedItem({ uid: "valueAxis",    type: "Measure",    values: ["Call Count"] }));
+                oVizFrame.addFeed(new FeedItem({ uid: "categoryAxis", type: "Dimension",  values: ["Object ID"]  }));
 
-                oVizFrame.addFeed(new FeedItem({
-                    uid:    "valueAxis",
-                    type:   "Measure",
-                    values: ["Call Count"]
-                }));
-                oVizFrame.addFeed(new FeedItem({
-                    uid:    "categoryAxis",
-                    type:   "Dimension",
-                    values: ["Object ID"]
-                }));
-
-                // Bug 4 fix: placeAt() expects a DOM element ID string.
-                // Since we're in light DOM, document.getElementById finds it normally.
+                this._vizFrame = oVizFrame;
                 oVizFrame.placeAt(containerId);
-                console.log("🔥 Chart placed at:", containerId);
+                console.log("🔥 Chart placed at #" + containerId);
             });
         }
     }
